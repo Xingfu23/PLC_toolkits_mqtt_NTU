@@ -8,6 +8,9 @@ import schedule
 import pytz
 import configparser
 from datetime import datetime
+import yaml
+import os 
+import sys
 
 # import mqtt modules
 import paho.mqtt.client as mqtt
@@ -22,26 +25,50 @@ import snap7
 """
 Setting basic information
 """
-config = configparser.ConfigParser()
-config.read('config.ini', encoding='utf-8')
+# Loading yaml configuration file
+def load_config(config_path:str)->None:
+    if not os.path.exists(config_path):
+        print(f"Error, there is no configuration file: '{config_path}'")
+        sys.exit(1)
+    
+    with open(config_path, 'r', encoding='utf-8') as f:
+        try:
+            return yaml.safe_load(f)
+        except yaml.YAMLError as exc:
+            print(f"Error: {exc}")
+            sys.exit(1)
+
+config_path = 'HMI_Control.yml'
+config = load_config(config_path)
 
 # Database info
-DB_HOST = config.get('Database info', 'DB_HOST')
-DB_PORT = config.get('Database info', 'DB_PORT')
-DB_USER = config.get('Database info', 'DB_USER')
-DB_NAME = config.get('Database info', 'DB_NAME')
-DB_PASSWORD = config.get('Database info', 'DB_PASSWORD')
+DB_HOST = config['database']['DB_HOST']
+DB_PORT = config['database']['DB_PORT']
+DB_USER = config['database']['DB_USER']
+DB_NAME = config['database']['DB_NAME']
+DB_PASSWORD = config['database']['DB_PASSWORD']
 
 # MQTT info
-MQTT_BROKER = config.get('MQTT info', 'MQTT_BROKER')
-MQTT_PORT = int(config.get('MQTT info', 'MQTT_PORT'))
-MQTT_TOPIC = config.get('MQTT info', 'MQTT_TOPIC')
+MQTT_BROKER = config['mqtt']['MQTT_BROKER']
+MQTT_PORT = config['mqtt']['MQTT_PORT']
+MQTT_TOPIC = config['mqtt']['MQTT_TOPIC']
 
-# PLC info
-PLC_IP = config.get('PLC info', 'PLC_IP')
-PLC_RACK = 0
-PLC_SLOT = 1
-DB_NUMBER = 15
+#PLC info
+PLC_IP = config['plc']['ip']
+PLC_RACK = config['plc']['rack']
+PLC_SLOT = config['plc']['slot']
+DB_NUMBER = config['plc']['db_number']
+
+# Vaisala dew point sensor scale factor
+def act_dew_point(T_plc:float)->float:
+    """
+    The scalar factor is needed because of a bug in the PLC programming. 
+    In the PLC analogue module, they are programmed to measure the dew point with a current range of 0 mA to 20 mA; 
+    however, the Vaisala dew point sensor measures the dew point with a current range of 4 mA to 20 mA. 
+    This PLC bug results in inaccurate readings, so we need to account for this when calculating the true dew point.
+    """
+    T_real = 1.25 * T_plc - 5
+    return T_real
 
 # Sensor id information
 sensor_id_list = [
@@ -204,6 +231,8 @@ def schedule_job():
         rtd07 = read_sensor_real(234)
         rtd08 = read_sensor_real(272)
         # dew point
+        # dmt01 = act_dew_point(read_sensor_real(314))
+        # dmt02 = act_dew_point(read_sensor_real(356))
         dmt01 = read_sensor_real(314)
         dmt02 = read_sensor_real(356)
         # chiller temp
