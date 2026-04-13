@@ -1,3 +1,4 @@
+import numpy as np
 import snap7
 from snap7.util import set_int, set_real, set_bool, get_bool
 from snap7.type import Areas
@@ -89,8 +90,6 @@ def system_status(client)->list:
     is_go_warm = read_m_bool(client, byte_offset=100, bit_index=3)
     is_door_lock = read_m_bool(client, byte_offset=60, bit_index=0)
 
-    print(f'idle_running:{idle_running}')
-
     if not is_door_lock:
         result = [status_code, status_dict[status_code]]
         return result
@@ -112,3 +111,9 @@ def system_status(client)->list:
     
     result = [status_code, status_dict[status_code]]
     return result
+
+def avg_dewpoint(client)->float:
+    dewpoint1 = read_sensor_real(client, 15, 314)
+    dewpoint2 = read_sensor_real(client, 15, 356)
+    avg_dewpoint = np.mean([dewpoint1, dewpoint2])
+    return avg_dewpoint
